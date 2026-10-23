@@ -1,10 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Sidebar, TabType } from './components/layout/Sidebar'
 import { StatCards } from './components/dashboard/StatCards'
 import { TransactionFormModal } from './components/transactions/TransactionFormModal'
 import { TransactionTable } from './components/transactions/TransactionTable'
-import { Category, TransactionWithCategory, BudgetWithSpend, CreateTransactionInput } from './types'
-import { Plus, Calendar, RefreshCw } from 'lucide-react'
+import { BudgetManager } from './components/budgets/BudgetManager'
+import {
+  Category,
+  TransactionWithCategory,
+  BudgetWithSpend,
+  CreateTransactionInput,
+  SetBudgetInput
+} from './types'
+import {
+  Plus,
+  Calendar,
+  RefreshCw,
+  PieChart as PieIcon
+} from 'lucide-react'
 
 export function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabType>('Dashboard')
@@ -101,6 +113,77 @@ export function App(): React.JSX.Element {
     }
   }
 
+  // Optimistic budget set / update
+  const handleSetBudget = async (input: SetBudgetInput): Promise<void> => {
+    if (!window.api) return
+    await window.api.setBudget(input)
+
+    setBudgets((prev) => {
+      const existing = prev.find(
+        (b) => b.category_id === input.category_id && b.month_year === input.month_year
+      )
+      const category = categories.find((c) => c.id === input.category_id)
+
+      if (existing) {
+        return prev.map((b) =>
+          b.category_id === input.category_id && b.month_year === input.month_year
+            ? { ...b, monthly_limit: input.monthly_limit }
+            : b
+        )
+      } else {
+        const currentMonthSpend = transactions
+          .filter(
+            (t) =>
+              t.category_id === input.category_id &&
+              t.type === 'expense' &&
+              t.date.startsWith(input.month_year)
+          )
+          .reduce((sum, t) => sum + t.amount, 0)
+
+        const newBudget: BudgetWithSpend = {
+          id: Date.now(),
+          category_id: input.category_id,
+          category_name: category?.name || '',
+          category_color: category?.color || '#3b82f6',
+          category_icon: category?.icon || 'tag',
+          monthly_limit: input.monthly_limit,
+          month_year: input.month_year,
+          current_spend: currentMonthSpend
+        }
+        return [...prev, newBudget]
+      }
+    })
+  }
+
+  // Report calculations
+  const monthlyTransactions = useMemo(() => {
+    return transactions.filter((t) => t.date.startsWith(selectedMonth))
+  }, [transactions, selectedMonth])
+
+  const categoryExpenses = useMemo(() => {
+    const expenseTx = monthlyTransactions.filter((t) => t.type === 'expense')
+    const totalExp = expenseTx.reduce((sum, t) => sum + t.amount, 0)
+    const map = new Map<number, { name: string; color: string; total: number }>()
+
+    for (const tx of expenseTx) {
+      const catId = tx.category_id ?? 0
+      const existing = map.get(catId) || {
+        name: tx.category_name || 'Uncategorized',
+        color: tx.category_color || '#94a3b8',
+        total: 0
+      }
+      existing.total += tx.amount
+      map.set(catId, existing)
+    }
+
+    return Array.from(map.values())
+      .map((item) => ({
+        ...item,
+        percentage: totalExp > 0 ? Math.round((item.total / totalExp) * 100) : 0
+      }))
+      .sort((a, b) => b.total - a.total)
+  }, [monthlyTransactions])
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
       {/* Navigation Sidebar */}
@@ -159,9 +242,10 @@ export function App(): React.JSX.Element {
             selectedMonth={selectedMonth}
           />
 
-          {/* Tab Placeholder or Views */}
+          {/* DASHBOARD TAB */}
           {activeTab === 'Dashboard' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Recent Transactions List */}
               <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -183,33 +267,41 @@ export function App(): React.JSX.Element {
                 />
               </div>
 
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Monthly Budgets</h3>
-                    <p className="text-xs text-slate-400">Current limits & spend</p>
+              {/* Quick Budget Progress */}
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Monthly Budgets</h3>
+                      <p className="text-xs text-slate-400">Limits & spend tracker</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('Budgets')}
+                      className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
+                    >
+                      Manage →
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setActiveTab('Budgets')}
-                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
-                  >
-                    Manage →
-                  </button>
-                </div>
-                <div className="text-xs text-slate-500 py-8 text-center">
-                  Budget progress will be shown here.
+                  <BudgetManager
+                    budgets={budgets}
+                    categories={categories}
+                    selectedMonth={selectedMonth}
+                    onSetBudget={handleSetBudget}
+                    compact
+                  />
                 </div>
               </div>
             </div>
           )}
 
+          {/* TRANSACTIONS TAB */}
           {activeTab === 'Transactions' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-white">All Transactions</h3>
                   <p className="text-xs text-slate-400">
-                    Showing all recorded incoming and outgoing transactions
+                    Comprehensive ledger of all your expense and income records
                   </p>
                 </div>
                 <button
@@ -225,6 +317,74 @@ export function App(): React.JSX.Element {
                 categories={categories}
                 onDeleteTransaction={handleDeleteTransaction}
               />
+            </div>
+          )}
+
+          {/* BUDGETS TAB */}
+          {activeTab === 'Budgets' && (
+            <BudgetManager
+              budgets={budgets}
+              categories={categories}
+              selectedMonth={selectedMonth}
+              onSetBudget={handleSetBudget}
+            />
+          )}
+
+          {/* REPORTS TAB */}
+          {activeTab === 'Reports' && (
+            <div className="space-y-6">
+              <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
+                <div className="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                  <PieIcon className="w-4 h-4" />
+                  <span>Spending Distribution</span>
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  Monthly Expense Breakdown ({selectedMonth})
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Categorical distribution of all outgoing expenses for this period.
+                </p>
+
+                <div className="mt-6 space-y-4">
+                  {categoryExpenses.length === 0 ? (
+                    <div className="py-10 text-center text-slate-500 text-xs">
+                      No expense data recorded for {selectedMonth}.
+                    </div>
+                  ) : (
+                    categoryExpenses.map((item, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-200 flex items-center gap-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            {item.name}
+                          </span>
+                          <span className="font-bold text-slate-300">
+                            {new Intl.NumberFormat('en-IN', {
+                              style: 'currency',
+                              currency: 'INR'
+                            }).format(item.total)}{' '}
+                            <span className="text-slate-500 font-normal">
+                              ({item.percentage}%)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              backgroundColor: item.color,
+                              width: `${item.percentage}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
