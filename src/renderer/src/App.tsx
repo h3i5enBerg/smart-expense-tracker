@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Sidebar, TabType } from './components/layout/Sidebar'
 import { StatCards } from './components/dashboard/StatCards'
 import { TransactionFormModal } from './components/transactions/TransactionFormModal'
+import { TransactionTable } from './components/transactions/TransactionTable'
 import { Category, TransactionWithCategory, BudgetWithSpend, CreateTransactionInput } from './types'
 import { Plus, Calendar, RefreshCw } from 'lucide-react'
 
@@ -76,6 +77,30 @@ export function App(): React.JSX.Element {
     }
   }
 
+  // Optimistic transaction deletion
+  const handleDeleteTransaction = async (id: number): Promise<void> => {
+    if (!window.api) return
+    const target = transactions.find((t) => t.id === id)
+    setTransactions((prev) => prev.filter((t) => t.id !== id))
+
+    if (target && target.type === 'expense' && target.date.startsWith(selectedMonth)) {
+      setBudgets((prev) =>
+        prev.map((b) =>
+          b.category_id === target.category_id
+            ? { ...b, current_spend: Math.max(0, b.current_spend - target.amount) }
+            : b
+        )
+      )
+    }
+
+    try {
+      await window.api.deleteTransaction(id)
+    } catch (err) {
+      console.error('Failed to delete transaction:', err)
+      loadData()
+    }
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
       {/* Navigation Sidebar */}
@@ -139,25 +164,34 @@ export function App(): React.JSX.Element {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-white">Recent Transactions</h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Recent Transactions</h3>
+                    <p className="text-xs text-slate-400">Latest 5 activities</p>
+                  </div>
                   <button
                     onClick={() => setActiveTab('Transactions')}
-                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition"
+                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
                   >
                     View All →
                   </button>
                 </div>
-                <div className="text-xs text-slate-500 py-8 text-center">
-                  Transactions will be listed here.
-                </div>
+                <TransactionTable
+                  transactions={transactions.slice(0, 5)}
+                  categories={categories}
+                  onDeleteTransaction={handleDeleteTransaction}
+                  compact
+                />
               </div>
 
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-white">Monthly Budgets</h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Monthly Budgets</h3>
+                    <p className="text-xs text-slate-400">Current limits & spend</p>
+                  </div>
                   <button
                     onClick={() => setActiveTab('Budgets')}
-                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition"
+                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
                   >
                     Manage →
                   </button>
@@ -166,6 +200,31 @@ export function App(): React.JSX.Element {
                   Budget progress will be shown here.
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'Transactions' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">All Transactions</h3>
+                  <p className="text-xs text-slate-400">
+                    Showing all recorded incoming and outgoing transactions
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Entry</span>
+                </button>
+              </div>
+              <TransactionTable
+                transactions={transactions}
+                categories={categories}
+                onDeleteTransaction={handleDeleteTransaction}
+              />
             </div>
           )}
         </div>
