@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Sidebar, TabType } from './components/layout/Sidebar'
 import { StatCards } from './components/dashboard/StatCards'
-import { Category, TransactionWithCategory, BudgetWithSpend } from './types'
+import { TransactionFormModal } from './components/transactions/TransactionFormModal'
+import { Category, TransactionWithCategory, BudgetWithSpend, CreateTransactionInput } from './types'
 import { Plus, Calendar, RefreshCw } from 'lucide-react'
 
 export function App(): React.JSX.Element {
@@ -16,8 +17,6 @@ export function App(): React.JSX.Element {
   const [budgets, setBudgets] = useState<BudgetWithSpend[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false)
-  void categories
-  void isAddModalOpen
 
   // Load data from IPC bridge
   const loadData = async (): Promise<void> => {
@@ -43,6 +42,39 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     loadData()
   }, [selectedMonth])
+
+  // Optimistic transaction addition
+  const handleAddTransaction = async (input: CreateTransactionInput): Promise<void> => {
+    if (!window.api) return
+    const res = await window.api.addTransaction(input)
+    const category = categories.find((c) => c.id === input.category_id)
+
+    const newTx: TransactionWithCategory = {
+      id: res.id,
+      amount: input.amount,
+      type: input.type,
+      category_id: input.category_id,
+      date: input.date,
+      note: input.note ?? null,
+      created_at: new Date().toISOString(),
+      category_name: category?.name ?? null,
+      category_color: category?.color ?? null,
+      category_icon: category?.icon ?? null
+    }
+
+    setTransactions((prev) => [newTx, ...prev])
+
+    // Update budget spend if applicable
+    if (input.type === 'expense' && input.date.startsWith(selectedMonth)) {
+      setBudgets((prev) =>
+        prev.map((b) =>
+          b.category_id === input.category_id
+            ? { ...b, current_spend: b.current_spend + input.amount }
+            : b
+        )
+      )
+    }
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
@@ -138,6 +170,14 @@ export function App(): React.JSX.Element {
           )}
         </div>
       </main>
+
+      {/* Transaction Entry Modal */}
+      <TransactionFormModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        categories={categories}
+        onSubmit={handleAddTransaction}
+      />
     </div>
   )
 }
