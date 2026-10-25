@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import Papa from 'papaparse'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import {
   FileSpreadsheet,
   FileText,
@@ -108,13 +110,195 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     }
   }
 
-  // Placeholder for PDF handler (will be fully implemented in Commit 10)
+  // 2. Export PDF Handler via jsPDF & jspdf-autotable
   const handleExportPdf = async (): Promise<void> => {
-    setIsExportingPdf(true)
-    try {
+    if (!window.api) return
+    if (exportTransactions.length === 0) {
       setStatusMessage({
-        type: 'info',
-        text: 'Preparing PDF engine...'
+        type: 'error',
+        text: 'No transactions found for the selected period to export.'
+      })
+      return
+    }
+
+    setIsExportingPdf(true)
+    setStatusMessage(null)
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'a4'
+      })
+
+      const pageWidth = doc.internal.pageSize.getWidth()
+
+      // Header Banner
+      doc.setFillColor(30, 41, 59) // slate-800
+      doc.rect(0, 0, pageWidth, 75, 'F')
+
+      // Title
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(18)
+      doc.setTextColor(255, 255, 255)
+      doc.text('SMART EXPENSE TRACKER', 40, 38)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(148, 163, 184) // slate-400
+      doc.text('EXECUTIVE FINANCIAL STATEMENT & TRANSACTION LEDGER', 40, 55)
+
+      // Report Metadata
+      const periodLabel = isAllTime ? 'All Time History' : `Period: ${selectedMonth}`
+      const generatedDate = new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+
+      doc.setFontSize(8.5)
+      doc.setTextColor(203, 213, 225)
+      doc.text(`Generated: ${generatedDate}`, pageWidth - 40, 38, { align: 'right' })
+      doc.text(periodLabel, pageWidth - 40, 55, { align: 'right' })
+
+      // KPI Metric Summary Boxes
+      const cardY = 95
+      const cardHeight = 55
+      const gap = 12
+      const cardWidth = (pageWidth - 80 - gap * 2) / 3
+
+      // Total Income Card
+      doc.setFillColor(240, 253, 244) // emerald-50
+      doc.setDrawColor(187, 247, 208) // emerald-200
+      doc.roundedRect(40, cardY, cardWidth, cardHeight, 6, 6, 'FD')
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(21, 128, 61) // emerald-700
+      doc.text('TOTAL INCOME', 50, cardY + 18)
+      doc.setFontSize(13)
+      doc.text(formatCurrency(totalIncome), 50, cardY + 40)
+
+      // Total Expense Card
+      const card2X = 40 + cardWidth + gap
+      doc.setFillColor(255, 241, 242) // rose-50
+      doc.setDrawColor(254, 205, 211) // rose-200
+      doc.roundedRect(card2X, cardY, cardWidth, cardHeight, 6, 6, 'FD')
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(190, 18, 60) // rose-700
+      doc.text('TOTAL EXPENSES', card2X + 10, cardY + 18)
+      doc.setFontSize(13)
+      doc.text(formatCurrency(totalExpense), card2X + 10, cardY + 40)
+
+      // Net Savings Card
+      const netSavings = totalIncome - totalExpense
+      const card3X = card2X + cardWidth + gap
+      doc.setFillColor(239, 246, 255) // blue-50
+      doc.setDrawColor(191, 219, 254) // blue-200
+      doc.roundedRect(card3X, cardY, cardWidth, cardHeight, 6, 6, 'FD')
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(29, 78, 216) // blue-700
+      doc.text('NET SAVINGS / BALANCE', card3X + 10, cardY + 18)
+      doc.setFontSize(13)
+      doc.text(formatCurrency(netSavings), card3X + 10, cardY + 40)
+
+      // Table of Transactions
+      const tableRows = exportTransactions.map((tx) => [
+        tx.date,
+        tx.type.toUpperCase(),
+        tx.category_name || 'Uncategorized',
+        tx.note || '-',
+        `${tx.type === 'expense' ? '-' : '+'}${formatCurrency(tx.amount)}`
+      ])
+
+      autoTable(doc, {
+        startY: 165,
+        margin: { left: 40, right: 40, bottom: 40 },
+        head: [['Date', 'Type', 'Category', 'Description / Note', 'Amount']],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8.5,
+          halign: 'left',
+          cellPadding: 6
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 5.5,
+          textColor: [30, 41, 59],
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 60, fontStyle: 'bold' },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 'auto' },
+          4: { cellWidth: 95, halign: 'right', fontStyle: 'bold' }
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        didParseCell: (hookData) => {
+          if (hookData.section === 'body') {
+            if (hookData.column.index === 1) {
+              const val = String(hookData.cell.raw)
+              hookData.cell.styles.textColor =
+                val === 'INCOME' ? [21, 128, 61] : [225, 29, 72]
+            } else if (hookData.column.index === 4) {
+              const val = String(hookData.cell.raw)
+              hookData.cell.styles.textColor = val.startsWith('-')
+                ? [225, 29, 72]
+                : [21, 128, 61]
+            }
+          }
+        },
+        didDrawPage: (hookData) => {
+          const pageCount = doc.getNumberOfPages()
+          doc.setFontSize(8)
+          doc.setTextColor(148, 163, 184)
+          doc.text(
+            `Smart Expense & Budget Tracker  •  Page ${hookData.pageNumber} of ${pageCount}`,
+            pageWidth / 2,
+            doc.internal.pageSize.getHeight() - 20,
+            { align: 'center' }
+          )
+        }
+      })
+
+      // Convert output to base64
+      const uriString = doc.output('datauristring')
+      const base64Content = uriString.split(',')[1]
+      const fileName = isAllTime
+        ? `Expense_Summary_All_Time_${new Date().toISOString().split('T')[0]}.pdf`
+        : `Expense_Summary_${selectedMonth}.pdf`
+
+      const res = await window.api.saveExportFile(fileName, base64Content, 'pdf')
+
+      if (res.success && res.filePath) {
+        setStatusMessage({
+          type: 'success',
+          text: `PDF document successfully generated and saved to: ${res.filePath}`
+        })
+      } else if (res.canceled) {
+        setStatusMessage({
+          type: 'info',
+          text: 'PDF export cancelled by user.'
+        })
+      } else if (res.error) {
+        setStatusMessage({
+          type: 'error',
+          text: `PDF generation failed: ${res.error}`
+        })
+      }
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to export PDF statement.'
       })
     } finally {
       setIsExportingPdf(false)
@@ -216,14 +400,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               </div>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Exports raw columns (Date, Type, Category, Description, and Amount) with UTF-8 encoding.
+              Exports raw columns (Date, Type, Category, Description, and Amount) with UTF-8 BOM encoding.
             </p>
           </div>
 
           <button
             onClick={handleExportCsv}
             disabled={isExportingCsv || exportTransactions.length === 0}
-            className="mt-5 w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-emerald-600/25 transition disabled:opacity-40 disabled:pointer-events-none"
+            className="mt-5 w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-emerald-600/25 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{isExportingCsv ? 'Saving File...' : 'Export as CSV'}</span>
@@ -252,7 +436,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           <button
             onClick={handleExportPdf}
             disabled={isExportingPdf || exportTransactions.length === 0}
-            className="mt-5 w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-rose-600/25 transition disabled:opacity-40 disabled:pointer-events-none"
+            className="mt-5 w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-rose-600/25 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{isExportingPdf ? 'Generating PDF...' : 'Export as PDF'}</span>
