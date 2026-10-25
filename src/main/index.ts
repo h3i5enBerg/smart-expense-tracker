@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { initDatabase, closeDatabase } from './db/database'
 import { registerTransactionIpc } from './ipc/transactionIpc'
+import { registerExportIpc } from './ipc/exportIpc'
 
 function createWindow(): void {
   // Create the browser window.
@@ -47,6 +48,7 @@ app.whenReady().then(() => {
   // Initialize SQLite database and register IPC bridge handlers
   initDatabase()
   registerTransactionIpc()
+  registerExportIpc()
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

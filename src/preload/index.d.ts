@@ -46,6 +46,13 @@ export interface SetBudgetInput {
   month_year: string
 }
 
+export interface SaveFileResult {
+  success: boolean
+  canceled: boolean
+  filePath?: string
+  error?: string
+}
+
 export interface ExpenseTrackerAPI {
   getTransactions: () => Promise<TransactionWithCategory[]>
   addTransaction: (data: CreateTransactionInput) => Promise<{ id: number; success: boolean }>
@@ -53,6 +60,11 @@ export interface ExpenseTrackerAPI {
   getCategories: () => Promise<Category[]>
   getBudgetsByMonth: (monthYear: string) => Promise<BudgetWithSpend[]>
   setBudget: (data: SetBudgetInput) => Promise<{ id: number; success: boolean }>
+  saveExportFile: (
+    fileName: string,
+    content: string,
+    type: 'csv' | 'pdf'
+  ) => Promise<SaveFileResult>
 }
 
 declare global {

@@ -22,7 +22,9 @@ const api = {
   deleteTransaction: (id: number) => ipcRenderer.invoke('transactions:delete', id),
   getCategories: () => ipcRenderer.invoke('categories:getAll'),
   getBudgetsByMonth: (monthYear: string) => ipcRenderer.invoke('budgets:getByMonth', monthYear),
-  setBudget: (data: SetBudgetInput) => ipcRenderer.invoke('budgets:set', data)
+  setBudget: (data: SetBudgetInput) => ipcRenderer.invoke('budgets:set', data),
+  saveExportFile: (fileName: string, content: string, type: 'csv' | 'pdf') =>
+    ipcRenderer.invoke('export:saveFile', { fileName, content, type })
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

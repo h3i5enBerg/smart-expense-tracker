@@ -6,6 +6,7 @@ import { TransactionTable } from './components/transactions/TransactionTable'
 import { BudgetManager } from './components/budgets/BudgetManager'
 import { ExpenseDonutChart } from './components/charts/ExpenseDonutChart'
 import { MonthlyTrendChart } from './components/charts/MonthlyTrendChart'
+import { ExportPanel } from './components/reports/ExportPanel'
 import {
   Category,
   TransactionWithCategory,
@@ -354,6 +355,12 @@ export function App(): React.JSX.Element {
           {/* REPORTS TAB */}
           {activeTab === 'Reports' && (
             <div className="space-y-6">
+              {/* Export Control Center */}
+              <ExportPanel
+                transactions={transactions}
+                selectedMonth={selectedMonth}
+              />
+
               <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
                 <div className="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   <PieIcon className="w-4 h-4" />
