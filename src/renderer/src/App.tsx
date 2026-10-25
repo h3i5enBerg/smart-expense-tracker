@@ -4,6 +4,8 @@ import { StatCards } from './components/dashboard/StatCards'
 import { TransactionFormModal } from './components/transactions/TransactionFormModal'
 import { TransactionTable } from './components/transactions/TransactionTable'
 import { BudgetManager } from './components/budgets/BudgetManager'
+import { ExpenseDonutChart } from './components/charts/ExpenseDonutChart'
+import { MonthlyTrendChart } from './components/charts/MonthlyTrendChart'
 import {
   Category,
   TransactionWithCategory,
@@ -244,7 +246,25 @@ export function App(): React.JSX.Element {
 
           {/* DASHBOARD TAB */}
           {activeTab === 'Dashboard' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-6">
+              {/* Visual Analytics Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <MonthlyTrendChart
+                    transactions={transactions}
+                    selectedMonth={selectedMonth}
+                  />
+                </div>
+                <div>
+                  <ExpenseDonutChart
+                    transactions={transactions}
+                    selectedMonth={selectedMonth}
+                  />
+                </div>
+              </div>
+
+              {/* Transactions and Budgets Summary Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recent Transactions List */}
               <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -291,6 +311,7 @@ export function App(): React.JSX.Element {
                   />
                 </div>
               </div>
+            </div>
             </div>
           )}
 
