@@ -170,13 +170,28 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
           <tbody className="divide-y divide-slate-800/40">
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <Receipt className="w-8 h-8 text-slate-600" />
-                    <p className="text-sm font-medium text-slate-400">No transactions recorded</p>
-                    <p className="text-xs text-slate-500">
-                      Use the &quot;Add Transaction&quot; button to record your first expense or income.
-                    </p>
+                <td colSpan={5} className="py-14 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2.5 max-w-sm mx-auto">
+                    <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/60 text-slate-400 shadow-sm">
+                      <Receipt className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    {transactions.length === 0 ? (
+                      <>
+                        <p className="text-sm font-bold text-white">
+                          No transactions found. Log your first expense!
+                        </p>
+                        <p className="text-xs text-slate-400 text-center leading-relaxed">
+                          Your transaction history is completely empty. Click &quot;Add Transaction&quot; or &quot;New Entry&quot; above to record your income or expenses.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold text-white">No matching transactions</p>
+                        <p className="text-xs text-slate-400 text-center leading-relaxed">
+                          No transactions match your current search &quot;{searchTerm}&quot; or active filter. Try resetting your filters.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

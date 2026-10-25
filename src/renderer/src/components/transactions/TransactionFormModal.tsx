@@ -154,8 +154,15 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 required
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                onChange={(e) => {
+                  setAmount(e.target.value)
+                  if (error) setError(null)
+                }}
+                className={`w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border text-white placeholder-slate-500 text-sm font-semibold focus:outline-none transition ${
+                  error && (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)
+                    ? 'border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                    : 'border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                }`}
               />
             </div>
           </div>
@@ -167,9 +174,16 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             </label>
             <select
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(e) => {
+                setCategoryId(e.target.value)
+                if (error) setError(null)
+              }}
               required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border text-white text-sm focus:outline-none transition ${
+                error && !categoryId
+                  ? 'border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                  : 'border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+              }`}
             >
               <option value="" disabled className="text-slate-500">
                 Select a category...

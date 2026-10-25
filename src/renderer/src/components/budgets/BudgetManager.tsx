@@ -176,6 +176,21 @@ export const BudgetManager: React.FC<BudgetManagerProps> = ({
         </div>
       </div>
 
+      {/* Empty State Prompt if no limits configured */}
+      {totalLimit === 0 && (
+        <div className="flex items-center space-x-3.5 p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/25 text-indigo-300">
+          <AlertCircle className="w-5 h-5 shrink-0 text-indigo-400" />
+          <div className="text-xs">
+            <span className="font-bold text-white block">
+              No monthly spending caps configured for {selectedMonth}
+            </span>
+            <span className="text-slate-400">
+              Set monthly budget limits on any category below to enable color-coded threshold warnings and prevent overspending.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Category Budgets Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {budgetList.map((cat) => {
